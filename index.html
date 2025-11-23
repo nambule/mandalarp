@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mandala Sequencer</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.39/Tone.min.js" defer></script>
+    <script src="main.js" type="module" defer></script>
+  </head>
+  <body>
+    <div class="app">
+      <main class="page">
+        <section class="panel">
+          <div class="panel__header">
+            <h1>Mandala 16-Step Sequencer</h1>
+            <p>Toggle steps, set a tempo, then press play to hear the loop.</p>
+          </div>
+          <div class="controls">
+            <button id="transportToggle" class="btn btn--primary">Play</button>
+            <label class="tempo">
+              <span>Tempo</span>
+              <input id="tempoInput" type="number" min="40" max="220" value="120" />
+              <span class="bpm">bpm</span>
+            </label>
+          </div>
+          <div class="layout">
+            <div class="arpeggio">
+              <div class="actions">
+                <button id="btnShuffle" class="btn btn--primary btn--cta">Shuffle</button>
+              </div>
+              <label class="field">
+                <span class="field__label">Number of arp steps</span>
+                <select id="arpNotes" class="field__input">
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                </select>
+              </label>
+              <label class="field">
+                <span class="field__label">Arp style</span>
+                <select id="arpShape" class="field__input"></select>
+              </label>
+              <label class="field">
+                <span class="field__label">Scale</span>
+                <select id="arpScale" class="field__input">
+                  <option>major</option>
+                  <option>minor</option>
+                  <option>ionian</option>
+                  <option>dorian</option>
+                  <option>lydian</option>
+                  <option>mixolydian</option>
+                  <option>aeolian</option>
+                  <option>locrian</option>
+                  <option>pentatonic</option>
+                  <option>minor pentatonic</option>
+                  <option>minor melodic</option>
+                </select>
+              </label>
+              <label class="field">
+                <span class="field__label">Range</span>
+                <select id="arpOctaves" class="field__input">
+                  <option value="1">1 octave</option>
+                  <option value="2">2 octaves</option>
+                  <option value="3">3 octaves</option>
+                </select>
+              </label>
+            </div>
+            <div class="layout__canvas">
+              <div id="sequencer" class="sequencer" aria-live="polite"></div>
+            </div>
+          </div>
+          <div class="panel__footer">
+            <button id="clearSteps" class="btn btn--ghost">Clear Steps</button>
+          </div>
+        </section>
+      </main>
+      <aside class="debug-panel">
+        <div class="debug-panel__content">
+          <h2>Arp Debug</h2>
+          <label class="field">
+            <span class="field__label">Starting note</span>
+            <input id="arpStart" class="field__input" type="text" value="C2" />
+          </label>
+          <div class="debug-panel__settings">
+            <p class="debug-panel__settings-heading">Current settings</p>
+            <pre id="arpSettings" class="debug-panel__settings-text" readonly></pre>
+          </div>
+          <label class="field">
+            <span class="field__label">Debug order</span>
+            <textarea
+              id="arpDebug"
+              class="debug-panel__output"
+              rows="6"
+              readonly
+            ></textarea>
+          </label>
+        </div>
+      </aside>
+    </div>
+    <div id="notePicker" class="note-picker" hidden></div>
+  </body>
+</html>

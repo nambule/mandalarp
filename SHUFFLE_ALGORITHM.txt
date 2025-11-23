@@ -1,0 +1,38 @@
+Shuffle Algorithm Overview
+==========================
+
+Inputs
+------
+- Number of arp steps (`N`): how many scale degrees are available.
+- Arp style (`S`): permutation describing the order of the degrees.
+- Scale (`scale`): defines the semitone offsets for the degrees.
+- Octaves (`O`): number of octave layers to traverse.
+- Manual steps: each active pad defines a root note (degree 1).
+
+Process
+-------
+1. Build the `sequence` of semitone offsets by taking the first `N`
+   degrees from `scale` and reordering them with `S`.
+2. Rotate the `sequence` so that the manual degree stays first; the
+   remaining degrees become the `orderedIntervals` used for generated steps.
+3. For every manual step, collect the empty pads between it and the next
+   manual step (wrapping around the ring). Choose a random subset of
+   these pads; the subset can range from zero pads to all available pads.
+4. Sort the chosen pads in clockwise order. Iterate over them and assign
+   pitches:
+   - Determine the sequence index (`seqIndex = orderIdx % len(orderedIntervals)`).
+   - Determine the octave cycle (`cycle = floor(orderIdx / len(orderedIntervals))`)
+     and clamp it so it never exceeds `O - 1`.
+   - Compute the semitone offset using `orderedIntervals[seqIndex] + cycle * 12`.
+   - Add the offset to the manual note’s MIDI value (clamped between C2 and B6)
+     and convert the result to a note name.
+5. Store the generated note for the pad and mark it as “generated”.
+
+Guarantees
+----------
+- Manual pads always represent degree 1 of the arpeggio.
+- Generated pads follow the arpeggio style order, cycling through the
+  remaining degrees indefinitely.
+- Octave climbs occur only after completing a full pass through the
+  remaining degrees, up to the configured number of octaves.
+- No generated step overwrites or removes a manual step. Clear Steps resets all pads.
