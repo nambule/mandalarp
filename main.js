@@ -42,10 +42,13 @@ const shuffleBtn = document.getElementById("btnShuffle");
 const synth = new Tone.PolySynth(Tone.Synth).toDestination();
 const steps = [];
 const stepNotes = new Array(STEP_COUNT).fill("");
+const manualNoteVariants = new Array(STEP_COUNT).fill("dark");
 const generatedNotes = new Array(STEP_COUNT).fill("");
+const mutedPitchClasses = new Set();
 let currentPlaybackIdx = null;
 let pickerTargetIndex = null;
 let pickerAnchor = null;
+let pickerNoteShade = "dark";
 
 const ensureAudioContext = async () => {
   if (Tone.getContext().state !== "running") {
@@ -103,6 +106,18 @@ const formatNoteLabel = (note) => {
 
 const getDisplayNote = (index) => stepNotes[index] || generatedNotes[index] || "";
 
+const getPitchClass = (note) => {
+  if (!note) return "";
+  const match = note.trim().match(/^([A-G](?:#|b)?)/i);
+  return match ? match[1].toUpperCase() : "";
+};
+
+const isNoteMuted = (note) => mutedPitchClasses.has(getPitchClass(note));
+
+const refreshAllSteps = () => {
+  steps.forEach((_, idx) => refreshStepState(idx));
+};
+
 const updateStepNoteLabel = (index) => {
   const step = steps[index];
   if (!step) return;
@@ -117,8 +132,14 @@ const refreshStepState = (index) => {
   if (!stepBtn) return;
   const hasManual = Boolean(stepNotes[index]);
   const hasGenerated = Boolean(generatedNotes[index]);
+  const shade = manualNoteVariants[index] || "dark";
+  const note = getDisplayNote(index);
+  const muted = isNoteMuted(note);
   stepBtn.classList.toggle("is-active", hasManual);
+  stepBtn.classList.toggle("is-light", hasManual && shade === "light");
+  stepBtn.classList.toggle("is-dark", hasManual && shade !== "light");
   stepBtn.classList.toggle("is-generated", !hasManual && hasGenerated);
+  stepBtn.classList.toggle("is-muted", Boolean(note) && muted);
   stepBtn.setAttribute("aria-pressed", String(hasManual || hasGenerated));
   updateStepNoteLabel(index);
 };
@@ -303,8 +324,20 @@ const hideNotePicker = () => {
   pickerAnchor = null;
 };
 
+const setNoteShade = (shade, index) => {
+  pickerNoteShade = shade === "light" ? "light" : "dark";
+  notePicker.querySelectorAll("[data-note-shade]").forEach((btn) => {
+    btn.classList.toggle("is-selected", btn.dataset.noteShade === pickerNoteShade);
+  });
+  if (typeof index === "number" && stepNotes[index]) {
+    manualNoteVariants[index] = pickerNoteShade;
+    refreshStepState(index);
+  }
+};
+
 const renderNotePicker = (index) => {
   notePicker.innerHTML = "";
+  const currentNote = getDisplayNote(index);
   OCTAVES.forEach((octave) => {
     const rowWrapper = document.createElement("div");
     rowWrapper.className = "note-picker__row";
@@ -328,7 +361,7 @@ const renderNotePicker = (index) => {
       }
       btn.addEventListener("click", async (event) => {
         event.stopPropagation();
-        await applyNoteSelection(index, note);
+        await applyNoteSelection(index, note, pickerNoteShade);
         hideNotePicker();
       });
       row.appendChild(btn);
@@ -339,12 +372,83 @@ const renderNotePicker = (index) => {
     notePicker.appendChild(rowWrapper);
   });
 
+  const shadeRow = document.createElement("div");
+  shadeRow.className = "note-picker__shade";
+
+  const shadeLabel = document.createElement("div");
+  shadeLabel.className = "note-picker__label";
+  shadeLabel.textContent = "Shade";
+
+  const shadeOptions = document.createElement("div");
+  shadeOptions.className = "note-picker__shade-options";
+
+  const darkBtn = document.createElement("button");
+  darkBtn.type = "button";
+  darkBtn.className = "note-picker__chip";
+  darkBtn.dataset.noteShade = "dark";
+  darkBtn.textContent = "Dark red";
+  darkBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setNoteShade("dark", index);
+  });
+
+  const lightBtn = document.createElement("button");
+  lightBtn.type = "button";
+  lightBtn.className = "note-picker__chip";
+  lightBtn.dataset.noteShade = "light";
+  lightBtn.textContent = "Light red";
+  lightBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setNoteShade("light", index);
+  });
+
+  shadeOptions.appendChild(darkBtn);
+  shadeOptions.appendChild(lightBtn);
+  shadeRow.appendChild(shadeLabel);
+  shadeRow.appendChild(shadeOptions);
+  notePicker.appendChild(shadeRow);
+
+  const muteRow = document.createElement("div");
+  muteRow.className = "note-picker__mute";
+
+  const muteBtn = document.createElement("button");
+  muteBtn.type = "button";
+  muteBtn.className = "note-picker__chip note-picker__chip--mute";
+  const updateMuteLabel = () => {
+    const pitchClass = getPitchClass(currentNote);
+    const muted = isNoteMuted(currentNote);
+    muteBtn.textContent =
+      currentNote && pitchClass
+        ? muted
+          ? `Unmute ${pitchClass}`
+          : `Mute ${pitchClass}`
+        : "Mute note";
+    muteBtn.disabled = !currentNote;
+    muteBtn.classList.toggle("is-selected", muted);
+  };
+  muteBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const pitchClass = getPitchClass(currentNote);
+    if (!pitchClass) return;
+    if (mutedPitchClasses.has(pitchClass)) {
+      mutedPitchClasses.delete(pitchClass);
+    } else {
+      mutedPitchClasses.add(pitchClass);
+    }
+    refreshAllSteps();
+    updateMuteLabel();
+    hideNotePicker();
+  });
+  updateMuteLabel();
+  muteRow.appendChild(muteBtn);
+  notePicker.appendChild(muteRow);
+
   const clearOption = document.createElement("button");
   clearOption.type = "button";
   clearOption.className = "note-picker__clear";
   clearOption.textContent = "Clear note";
   clearOption.addEventListener("click", async () => {
-    await applyNoteSelection(index, "");
+    await applyNoteSelection(index, "", pickerNoteShade);
     hideNotePicker();
   });
   notePicker.appendChild(clearOption);
@@ -353,11 +457,14 @@ const renderNotePicker = (index) => {
   hint.className = "note-picker__hint";
   hint.textContent = "Tap outside or press Esc to close";
   notePicker.appendChild(hint);
+
+  setNoteShade(manualNoteVariants[index] || "dark", index);
 };
 
 const openNotePicker = (stepBtn, index) => {
   pickerTargetIndex = index;
   pickerAnchor = stepBtn;
+  pickerNoteShade = manualNoteVariants[index] || "dark";
   renderNotePicker(index);
   notePicker.hidden = false;
   notePicker.style.visibility = "hidden";
@@ -377,15 +484,19 @@ const openNotePicker = (stepBtn, index) => {
   notePicker.scrollTop = 0;
 };
 
-const applyNoteSelection = async (index, note) => {
+const applyNoteSelection = async (index, note, shade = "dark") => {
   if (note) {
     stepNotes[index] = note;
+    manualNoteVariants[index] = shade === "light" ? "light" : "dark";
     clearGeneratedAt(index);
     refreshStepState(index);
-    await ensureAudioContext();
-    synth.triggerAttackRelease(note, "16n");
+    if (!isNoteMuted(note)) {
+      await ensureAudioContext();
+      synth.triggerAttackRelease(note, "16n");
+    }
   } else {
     stepNotes[index] = "";
+    manualNoteVariants[index] = "dark";
     clearGeneratedAt(index);
     refreshStepState(index);
   }
@@ -393,6 +504,8 @@ const applyNoteSelection = async (index, note) => {
 
 const clearSteps = () => {
   stepNotes.fill("");
+  manualNoteVariants.fill("dark");
+  mutedPitchClasses.clear();
   clearGeneratedSteps();
   steps.forEach((_, idx) => {
     refreshStepState(idx);
@@ -516,8 +629,8 @@ manualIndexes.sort((a, b) => a - b);
 const sequence = new Tone.Sequence(
   (time, stepIndex) => {
     Tone.Draw.schedule(() => flashStep(stepIndex), time);
-    const note = stepNotes[stepIndex] || generatedNotes[stepIndex];
-    if (note) {
+    const note = getDisplayNote(stepIndex);
+    if (note && !isNoteMuted(note)) {
       synth.triggerAttackRelease(note, "16n", time);
     }
   },
