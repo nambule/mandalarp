@@ -38,6 +38,7 @@ const arpOctavesInput = document.getElementById("arpOctaves");
 const arpStartInput = document.getElementById("arpStart");
 const arpDebugInput = document.getElementById("arpDebug");
 const shuffleBtn = document.getElementById("btnShuffle");
+const ASSISTANT_STORAGE_KEY = "mandalaAssistantSeen";
 
 const synth = new Tone.PolySynth(Tone.Synth).toDestination();
 const steps = [];
@@ -49,6 +50,7 @@ let currentPlaybackIdx = null;
 let pickerTargetIndex = null;
 let pickerAnchor = null;
 let pickerNoteShade = "dark";
+let assistantEl = null;
 
 const ensureAudioContext = async () => {
   if (Tone.getContext().state !== "running") {
@@ -193,6 +195,62 @@ const sanitizeStartNote = (value) => {
   } catch {
     return fallback;
   }
+};
+
+const markAssistantSeen = () => {
+  try {
+    localStorage.setItem(ASSISTANT_STORAGE_KEY, "1");
+  } catch {
+    // ignore storage failures
+  }
+};
+
+const hideAssistant = () => {
+  if (assistantEl) {
+    assistantEl.remove();
+    assistantEl = null;
+  }
+};
+
+const showAssistant = () => {
+  try {
+    if (localStorage.getItem(ASSISTANT_STORAGE_KEY)) return;
+  } catch {
+    // if storage fails, still show assistant once
+  }
+  if (assistantEl) return;
+  const overlay = document.createElement("div");
+  overlay.className = "assistant";
+  overlay.innerHTML = `
+    <div class="assistant__card" role="dialog" aria-label="How to use the sequencer">
+      <p class="assistant__eyebrow">First time here?</p>
+      <h3 class="assistant__title">Quick start</h3>
+      <ol class="assistant__steps">
+        <li>Add one note on the circle.</li>
+        <li>Choose your parameters (steps, scale, range).</li>
+        <li>Tap Shuffle to fill the pattern.</li>
+        <li>Press Play to hear it loop.</li>
+      </ol>
+      <div class="assistant__actions">
+        <button type="button" class="btn btn--primary assistant__close" data-assistant-dismiss>Got it</button>
+      </div>
+    </div>
+  `;
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) {
+      markAssistantSeen();
+      hideAssistant();
+    }
+  });
+  const closeBtn = overlay.querySelector("[data-assistant-dismiss]");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      markAssistantSeen();
+      hideAssistant();
+    });
+  }
+  assistantEl = overlay;
+  document.body.appendChild(overlay);
 };
 
 const updateDebugInfo = () => {
@@ -669,3 +727,4 @@ arpStartInput.addEventListener("change", () => {
   updateDebugInfo();
 });
 shuffleBtn.addEventListener("click", handleShuffle);
+showAssistant();
